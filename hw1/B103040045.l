@@ -25,7 +25,6 @@ digit [0-9]
 
 id [a-zA-Z_][a-zA-Z0-9_]{0,14}
 symbol ";"|":"|"("|")"|":="|">"|"<"|"="|"=="|"<="|">="|"["|"]"|"+"|"-"|"*"|"/"|"."
-undefined_symbol !|"#"|\$|%|&|,|\?|@|\\|\^|`|\{|\}|\||~
 integer [+-]?[0-9][0-9]*
 fraction [0-9]+
 float ({integer}[Ff]?|({integer}"."{fraction}[Ff]?))([Ee]{integer})?
@@ -36,15 +35,17 @@ octal [+-]?[&][0-7]+
 string ([']([^'\n\r\n]|[']['][^'\n\r\n]*)*['])
 	/* Inside a (* *) are all comments. */
 	/* advance note: there are some other comment like: // {} */
-comment [(][*]([^*]|{eol}|([*]+([^*)]|{eol})))*[*]+[)]
+comment (([(][*])|[{])([^*]|{eol}|([*]+([^*)]|{eol})))*(([*]+[)])|[}]) 
 
-not_id [a-zA-Z_][a-zA-Z0-9_]{15,}|([0-9]|[#\^\$%&\?\@\\`])+[a-zA-Z0-9_]*
+not_id [a-zA-Z_][a-zA-Z0-9_]{15,}|([0-9]|[#\^])+[a-zA-Z0-9_]*
 xfloat ([+-]?({integer}"."|"."{fraction})[Ff]?([Ee][+-]?{integer})?)
 	/* lack of ' at the begining or ending. */
 	/* Cannot use " as quoting symbol to string. */
 xstring ['][^';\n\r\n ]*[^;\n\r\n ]|[^';\n\r\n ]*[']|["][^';\n\r\n ]*[^;\n\r\n ]|[^';\n\r\n ]*["]|["]([^'\n\r\n]|["]["][^'\n\r\n]*)*["]
 	/* contain the situataion with only one side "(* or *) with all consideration. "*/
 xcomment  [(][*]([^* \n\r\n;]|[*]+[^*) \n\r\n;])*([*]+[^ \n\r\n);]|[^ \n\r\n;])|([^(* \n\r\n;]|([^(* \n\r\n;][*]+))*[*]+[)]
+/*undefined_symbols*/
+else .
 
 %%
 {space} {charCount++; op=0;}	/* just ignore space character */
@@ -77,11 +78,6 @@ xcomment  [(][*]([^* \n\r\n;]|[*]+[^*) \n\r\n;])*([*]+[^ \n\r\n);]|[^ \n\r\n;])|
 }
 {symbol} {
     printf("Line: %d,1st char: %d, \"%s\" is a \"symbol\".\n", lineCount, charCount, yytext);
-    charCount+=yyleng;
-	op=0;
-}
-{undefined_symbol} {
-	printf("Line: %d,1st char: %d, \"%s\" is a \"undefined_symbol\".\n", lineCount, charCount, yytext);
     charCount+=yyleng;
 	op=0;
 }
@@ -124,12 +120,12 @@ xcomment  [(][*]([^* \n\r\n;]|[*]+[^*) \n\r\n;])*([*]+[^ \n\r\n);]|[^ \n\r\n;])|
 	op=1;
 }
 {hexvalue} {
-    printf("Line: %d,1st char: %d, \"%s\" is a \"hexvalue\".\n", lineCount, charCount, yytext); 
+    printf("Line: %d,1st char: %d, \"%s\" is a \"hexvalue(Data Type: integer)\".\n", lineCount, charCount, yytext); 
     charCount+=yyleng;
 	op=0;
 }
 {octal} {
-    printf("Line: %d,1st char: %d, \"%s\" is a \"octal\".\n", lineCount, charCount, yytext); 
+    printf("Line: %d,1st char: %d, \"%s\" is a \"octal(Data Type: integer)\".\n", lineCount, charCount, yytext); 
     charCount+=yyleng;
 	op=0;
 }
@@ -145,7 +141,16 @@ xcomment  [(][*]([^* \n\r\n;]|[*]+[^*) \n\r\n;])*([*]+[^ \n\r\n);]|[^ \n\r\n;])|
 			if(yytext[i]==39 && yytext[i+1]==39 && i!=yyleng-2) // change '' to '
 			{
 				num+=2;
-				buf[temp++]=yytext[i++];
+				// Check if other character before double ''
+				// if yes, then change to single '
+				// otherwise, stay original
+				if (i-1 >=1 && yytext[i-1])
+					buf[temp++]=yytext[i++];
+				else
+				{
+					buf[temp++] = yytext[i];
+					buf[temp++] = yytext[i++];
+				}
 			}
 			else if(yytext[i]==39)
 			{
@@ -234,6 +239,11 @@ xcomment  [(][*]([^* \n\r\n;]|[*]+[^*) \n\r\n;])*([*]+[^ \n\r\n);]|[^ \n\r\n;])|
 		else 
 			charCount++;
 	}
+	op=0;
+}
+{else} {
+	printf("Line: %d,1st char: %d, \"%s\" is a \"unknown\".\n", lineCount, charCount, yytext);
+    charCount+=yyleng;
 	op=0;
 }
 
